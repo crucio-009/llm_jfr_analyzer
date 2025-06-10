@@ -1,48 +1,55 @@
 # LLM JFR Analyzer
 
-A side-project template for a Large Language Model-powered Java Flight Recorder (JFR) analysis tool that summarizes and diagnoses JVM performance issues from JFR files. 
+A side-project template for a Large Language Model-powered Java Flight Recorder (JFR) analysis tool that summarizes and diagnoses JVM performance issues from JFR files.
 
 **Features:**
-- Supports both paid API-based (OpenAI) and free, open-source HuggingFace models (Gemma, Mistral, Llama, TinyLlama, etc.)
-- Automatic setup and download of selected local LLM on demand
-- Flexible local LLM choice via environment variable, web UI, or CLI at runtime
-- FastAPI-based web UI for uploading `.jfr`/`.json`, model selection, downloadable Markdown reports, and setting the chunking threshold
-- CLI support for headless automation, with model & chunk size selection at runtime
-- Handles large `.jfr` files robustly by chunking them with `jfr disassemble` (JDK 17+), with user-configurable chunking threshold (MB)
-- Clear Python code ready for production adaptation
+- Analyze Java Flight Recorder files (binary `.jfr` or pre-extracted `.json`) using LLMs.
+- Supports both paid API-based (OpenAI) and free, open-source HuggingFace models (Gemma, Mistral, Llama, TinyLlama, etc.).
+- Choice of model and chunking threshold at runtime via web UI or CLI.
+- Automatic local model setup/download and transparent chunking for large profiles.
+- FastAPI web UI: upload files, select models, and view/download human-readable diagnostic reports.
+- CLI support: run full batch analyses, automate jobs, and control all parameters.
+- Robust handling of large `.jfr` files via `jfr disassemble` (Java 17+).
+- Thorough and modular test suite, including parser/feature/unit, web UI e2e, and CLI e2e coverage.
+- Clear Python code, extensible architecture, and no uploading of actual model weights/checkpoints to git.
 
 ---
 
 ## Requirements
 
 - Python 3.8+
-- **Java JDK 17 or newer** (required for direct parsing of `.jfr` files via `jfr print --json`; see [Oracle JDK 17 jfr docs](https://docs.oracle.com/en/java/javase/17/docs/specs/man/jfr.html))
-    - For large `.jfr` files, we **automatically use `jfr disassemble`** to split the recording into chunks before analysis (since Java 17). The chunking threshold (MB) is user-settable in the web UI or CLI.
-    - If you only process pre-extracted `.json` files (see `sample_data/event_snippets.json`), Java is not required.
-- See `requirements.txt` for Python dependencies.
+- **Java JDK 17 or newer**  
+  Required for direct parsing of `.jfr` binary files via `jfr print --json`.<br>
+  [Full JDK 17 jfr doc: Oracle](https://docs.oracle.com/en/java/javase/17/docs/specs/man/jfr.html)
+  - For large JFR files, uses `jfr disassemble` to split/repair files before analysis (also requires Java 17+).
+  - If using only extracted `.json`, Java is not required.
+- See `requirements.txt` for Python dependencies (including FastAPI, Transformers, OpenAI, etc.).
 
 ---
 
 ## Project Structure
 
 llm_jfr_analyzer/
-├── README.md                      # Project info and usage
-├── requirements.txt               # Python dependencies
-├── .env.example                   # Example environment (API keys, model names)
-├── main.py                        # CLI entry point
-├── webui.py                       # FastAPI Web UI
-├── jfr_parser.py                  # JFR → events extractor (handles chunking)
-├── feature_extractor.py           # JFR events → features/summary
-├── llm_prompter.py                # Handles OpenAI/local LLM prompt logic and switching
-├── report_generator.py            # Writes Markdown/HTML report from LLM output
-├── utils.py                       # Support helpers
+├── README.md
+├── requirements.txt
+├── .env.example
+├── main.py                  # CLI entry point
+├── webui.py                 # FastAPI web UI backend
+├── jfr_parser.py            # Extraction and chunking w/ disassemble
+├── feature_extractor.py     # Feature/summary generator for LLM
+├── llm_prompter.py          # Handles OpenAI/local LLM prompt logic
+├── report_generator.py      # Markdown/HTML report generator
+├── utils.py                 # Helpers
 ├── tests/
 │   ├── __init__.py
-│   ├── test_parser.py             # JFR parsing test
-│   ├── test_features.py           # Feature extraction test
+│   ├── test_parser.py       # Unit tests for parser
+│   ├── test_features.py     # Unit tests for feature extraction logic
+│   ├── test_webui.py        # End-to-end web UI file upload/diagnostic test
+│   └── test_cli.py          # End-to-end CLI diagnostics test
 ├── sample_data/
-│   ├── event_snippets.json        # Example event snippets for testing
-│   └── example.jfr                # Placeholder for JFR file
+│   ├── event_snippets.json  # Example valid event snippets (for testing)
+│   ├── example.jfr          # Placeholder for ignored test JFRs (see below)
+│   └── sample_test.jfr      # Place a REAL .jfr file here for full tests
 └── feature_extractor.py
 
 ---
@@ -56,68 +63,89 @@ pip install -r requirements.txt
 ```
 ### 2. Install Java 17+ (for `.jfr` file parsing)
 
-**You need Java 17 or newer for direct `.jfr` (binary) handling, due to the `jfr print --json` and `jfr disassemble` requirements.**
-- [Download OpenJDK 17+](https://jdk.java.net/17/)
-- Make sure `jfr` is in your PATH (`java -version` should show 17 or above)
-
+[Download OpenJDK 17+](https://jdk.java.net/17/) and ensure it is in your PATH:
+```
+java -version
+jfr --help
+```
 ### 3. Configure your environment
 
-Copy `.env.example` to `.env` and set as needed. (You do **not** need to set `LOCAL_LLM_MODEL` in `.env` anymore if you use CLI/UI selection.)
+Copy `.env.example` to `.env` and set/override secrets as needed (*not needed for local/default use*).
 
-### 4. Run the Web UI (model & chunk size selection included)
+---
+
+## Usage
+
+### Web UI (Recommended for exploration/interactivity)
 
 ```bash
 uvicorn webui:app --reload --port 8080
 ```
-Go to http://localhost:8080, upload a `.jfr` or `.json` file, select your LLM from a dropdown list, and set the chunking threshold (in MB, default 50). Files over this threshold will be chunked before analysis.
+Then open [http://localhost:8080](http://localhost:8080), upload a `.jfr` or `.json`, set chunking threshold & model, and generate a full LLM report from your browser.
 
-### 5. Or, use the CLI (with runtime LLM and chunk size selection)
+### CLI (For headless/batch/automation)
 
 ```bash
-python main.py --jfr myfile.jfr --uselocal --llmmodel google/gemma-2b-it --chunkthresh 50
+python main.py --jfr path/to/file.jfr --uselocal --llmmodel google/gemma-2b-it --chunkthresh 50
 ```
-- Use `--llmmodel` to select any of these supported local LLM models at runtime:
-  - `google/gemma-2b-it` (default)
-  - `mistralai/Mistral-7B-Instruct`
-  - `TinyLlama/TinyLlama-1.1B-Chat-v1.0`
-  - `meta-llama/Llama-2-7b-chat-hf`
-
-- Use `--chunkthresh` to set the chunk size threshold in MB for `.jfr` disassembly.
+All model and chunking options at runtime. Output report is saved to the path specified by `--output`, defaulting to `analysis_report.md`.
 
 ---
 
 ## Model Selection
 
-- Any HuggingFace-supported text-generation model in the supported models list can be used locally—choose via web UI or CLI (`--llmmodel`) at runtime.
-- If using OpenAI, set the API key and model in `.env` as before.
+- Choose any local supported model in either web UI or CLI:
+  - `google/gemma-2b-it` (default)
+  - `mistralai/Mistral-7B-Instruct`
+  - `TinyLlama/TinyLlama-1.1B-Chat-v1.0`
+  - `meta-llama/Llama-2-7b-chat-hf`
+- OpenAI/GPT requires config in `.env`.
 
 ---
 
 ## How It Works
 
-1. Parses/extracts events from your JFR/json file. For large `.jfr` files, they are chunked (user-set threshold) and aggregated chunk-wise.
-2. Summarizes threads, GC, SQL, etc. for LLM-friendly prompt.
-3. LLM (OpenAI **or** local) analyzes and returns diagnostic output.
-4. The tool writes a report (Markdown/HTML) with plain-English JVM analysis.
+1. Upload or point the tool at `.jfr`/`.json` data.
+2. (Optionally) Automatically chunk large `.jfr` files.
+3. Extracts features (GC/threads/SQL etc.) for LLM prompt context.
+4. LLM analyses and outputs summary/recommendations.
+5. Human-readable report is produced for download/CI/share.
 
 ---
 
-## Advanced Usage and Notes
+## Testing
 
-- Only tested and supported models for JVM diagnostics are exposed for user/runtime selection.
-- On first use, the tool will automatically download the chosen local model if not found.
-- The parser and UI ensure only compatible, proven models are selectable per analysis session.
-- The parser handles text and JSON JFR files; large files are safely chunked with a threshold set at runtime.
-- For more on the JSON and disassemble options, see [JDK 17 man page](https://docs.oracle.com/en/java/javase/17/docs/specs/man/jfr.html).
+All tests in the `tests/` directory. To run everything:
+
+```bash
+python -m unittest discover -s tests
+```
+**Covers:**
+- Unit and integration tests for parsing, feature extraction.
+- End-to-end test for web UI (`test_webui.py`):
+  - Simulates uploading JSON and (optionally) a real JFR (`sample_data/sample_test.jfr`) for round-trip diagnostic to output.
+- End-to-end test for CLI (`test_cli.py`):
+  - Runs the CLI on JSON and (optionally) a real JFR (`sample_data/sample_test.jfr`) and checks the written report.
+  - **To fully enable end-to-end tests with binary JFRs:**  
+    - Place a real Java Flight Recorder `.jfr` file in `sample_data/sample_test.jfr` (this file is .gitignored by default and not included in the repo).
+
+---
+
+## Notes & Guidelines
+
+- All JFR files and large binaries (`*.jfr`) are git-ignored; include them only locally for your own regression tests.
+- Model weights/checkpoints are not uploaded to the repo—these are always downloaded on-demand via HuggingFace.
+- You can adapt or extend this project for different JVM event filtering, prompt engineering, or model selection.
+- As with all AI assistants, human review of LLM findings for production/mission-critical scenarios is recommended.
 
 ---
 
 ## Future Improvements
 
-- Visualization/charts for performance stats
-- Interactive web diagnostics, further tuning, & project integration
-- Multi-file and scheduled batch processing
-- Feedback-driven report refinement
+- JVM performance visualization/charts
+- Advanced prompt customization and feedback loops in UI
+- Support for continuous/batch monitoring and thresholds
+- Custom LLM/rule/plugin integrations
 
 ---
 
