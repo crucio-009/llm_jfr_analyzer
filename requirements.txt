@@ -1,0 +1,16 @@
+# Core dependencies for the LLM JFR Analyzer MVP
+openai
+python-dotenv
+jinja2
+pandas
+requests
+# For open source LLMs
+transformers
+torch
+sentencepiece
+# Web UI
+fastapi
+uvicorn
+python-multipart
+# For future parsing enhancements (optional, for advanced JFR parsing in Python)
+# jfr-python

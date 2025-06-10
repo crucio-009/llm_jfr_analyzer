@@ -1,0 +1,30 @@
+[
+    {
+        "event": "jdk.ThreadStuck",
+        "threadName": "weblogic.kernel.Default (self-tuning)",
+        "startTime": "2025-06-10T10:41:09.000Z",
+        "duration": 120000,
+        "stackTrace": [
+            "sun.nio.ch.SocketChannelImpl.write(SocketChannelImpl.java:466)",
+            "oracle.jdbc.driver.T4CPreparedStatement.executeQuery(T4CPreparedStatement.java:3771)",
+            "com.oracle.healthinsurance.claims.domain.internal.products.entities.ProductClaimsDomain.findBenefitsProviderGroup(ProductClaimsDomain.java:261)"
+        ]
+    },
+    {
+        "event": "jdk.GarbageCollection",
+        "startTime": "2025-06-10T10:41:49.000Z",
+        "longestPause": 370
+    },
+    {
+        "event": "jdk.SocketWrite",
+        "startTime": "2025-06-10T10:41:51.000Z",
+        "bytesWritten": 8192,
+        "remoteHost": "dbserver.example.com"
+    },
+    {
+        "event": "jdk.SQLExecution",
+        "sql": "select prgr_tl.base_table_id prgr_id ...",
+        "startTime": "2025-06-10T10:41:51.500Z",
+        "duration": 650
+    }
+]

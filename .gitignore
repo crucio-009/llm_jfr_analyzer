@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+.env
+.env.*
+*.sqlite3
+*.db
+*.log
+.DS_Store
+.cache/
+.idea/
+.vscode/
+*.ipynb
+*.egg-info/
+venv/
+.envrc
+# HuggingFace, model/download cache (usually outside, but for safety):
+huggingface/
+*.jfr
+
