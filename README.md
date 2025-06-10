@@ -5,9 +5,9 @@ A side-project template for a Large Language Model-powered Java Flight Recorder 
 **Features:**
 - Supports both paid API-based (OpenAI) and free, open-source HuggingFace models (Gemma, Mistral, Llama, TinyLlama, etc.)
 - Automatic setup and download of selected local LLM on demand
-- Flexible local LLM choice via environment variable or web UI
+- Flexible local LLM choice via environment variable, web UI, or CLI at runtime
 - FastAPI-based web UI for uploading `.jfr`/`.json`, model selection, downloadable Markdown reports, and setting the chunking threshold
-- CLI support for headless automation
+- CLI support for headless automation, with model & chunk size selection at runtime
 - Handles large `.jfr` files robustly by chunking them with `jfr disassemble` (JDK 17+), with user-configurable chunking threshold (MB)
 - Clear Python code ready for production adaptation
 
@@ -17,7 +17,7 @@ A side-project template for a Large Language Model-powered Java Flight Recorder 
 
 - Python 3.8+
 - **Java JDK 17 or newer** (required for direct parsing of `.jfr` files via `jfr print --json`; see [Oracle JDK 17 jfr docs](https://docs.oracle.com/en/java/javase/17/docs/specs/man/jfr.html))
-    - For large `.jfr` files, we **automatically use `jfr disassemble`** to split the recording into chunks before analysis (also available since Java 17). This chunking threshold (in MB) is now user-settable in the web UI.
+    - For large `.jfr` files, we **automatically use `jfr disassemble`** to split the recording into chunks before analysis (since Java 17). The chunking threshold (MB) is user-settable in the web UI or CLI.
     - If you only process pre-extracted `.json` files (see `sample_data/event_snippets.json`), Java is not required.
 - See `requirements.txt` for Python dependencies.
 
@@ -62,38 +62,40 @@ pip install -r requirements.txt
 
 ### 3. Configure your environment
 
-Copy `.env.example` to `.env` and set as needed.
+Copy `.env.example` to `.env` and set as needed. (You do **not** need to set `LOCAL_LLM_MODEL` in `.env` anymore if you use CLI/UI selection.)
 
-### 4. Run the Web UI (supports large file chunking, with threshold selection)
+### 4. Run the Web UI (model & chunk size selection included)
 
 ```bash
 uvicorn webui:app --reload --port 8080
 ```
-Go to http://localhost:8080, upload a `.jfr` or `.json` file, select your LLM (if desired), and set the chunking threshold (in MB, default 50). Files over this threshold will be chunked before further analysis.
+Go to http://localhost:8080, upload a `.jfr` or `.json` file, select your LLM from a dropdown list, and set the chunking threshold (in MB, default 50). Files over this threshold will be chunked before analysis.
 
-### 5. Or, use the CLI
+### 5. Or, use the CLI (with runtime LLM and chunk size selection)
 
 ```bash
-python main.py --jfr sample_data/event_snippets.json
+python main.py --jfr myfile.jfr --uselocal --llmmodel google/gemma-2b-it --chunkthresh 50
 ```
----
-
-## Model Selection
-
-- Any HuggingFace-supported text-generation model can be used locally—set via `LOCAL_LLM_MODEL` in your `.env` **or in the web UI**.
-- Example:  
+- Use `--llmmodel` to select any of these supported local LLM models at runtime:
   - `google/gemma-2b-it` (default)
   - `mistralai/Mistral-7B-Instruct`
   - `TinyLlama/TinyLlama-1.1B-Chat-v1.0`
   - `meta-llama/Llama-2-7b-chat-hf`
 
-> On first use, the tool will automatically download the selected local model if not found.
+- Use `--chunkthresh` to set the chunk size threshold in MB for `.jfr` disassembly.
+
+---
+
+## Model Selection
+
+- Any HuggingFace-supported text-generation model in the supported models list can be used locally—choose via web UI or CLI (`--llmmodel`) at runtime.
+- If using OpenAI, set the API key and model in `.env` as before.
 
 ---
 
 ## How It Works
 
-1. Parses/extracts events from your JFR/json file. For large `.jfr` files, they are chunked (according to the user-set threshold) and aggregated chunk-wise.
+1. Parses/extracts events from your JFR/json file. For large `.jfr` files, they are chunked (user-set threshold) and aggregated chunk-wise.
 2. Summarizes threads, GC, SQL, etc. for LLM-friendly prompt.
 3. LLM (OpenAI **or** local) analyzes and returns diagnostic output.
 4. The tool writes a report (Markdown/HTML) with plain-English JVM analysis.
@@ -102,9 +104,10 @@ python main.py --jfr sample_data/event_snippets.json
 
 ## Advanced Usage and Notes
 
-- The tool works with either standard JDK 17+ installed locally, or with `.json` exports if you run the conversion elsewhere.
-- Output includes human-readable reports, with a web UI for convenience and sharing.
-- The parser handles text and JSON JFR files; for large files, the user can set the chunk size threshold in the web UI.
+- Only tested and supported models for JVM diagnostics are exposed for user/runtime selection.
+- On first use, the tool will automatically download the chosen local model if not found.
+- The parser and UI ensure only compatible, proven models are selectable per analysis session.
+- The parser handles text and JSON JFR files; large files are safely chunked with a threshold set at runtime.
 - For more on the JSON and disassemble options, see [JDK 17 man page](https://docs.oracle.com/en/java/javase/17/docs/specs/man/jfr.html).
 
 ---

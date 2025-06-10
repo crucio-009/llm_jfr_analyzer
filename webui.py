@@ -12,6 +12,13 @@ from feature_extractor import extract_features
 from llm_prompter import analyze_with_llm
 from report_generator import write_report
 
+SUPPORTED_LLM_MODELS = [
+    ("google/gemma-2b-it", "Gemma 2B (Google, Efficient)"),
+    ("mistralai/Mistral-7B-Instruct", "Mistral 7B Instruct"),
+    ("TinyLlama/TinyLlama-1.1B-Chat-v1.0", "TinyLlama 1.1B Chat v1.0"),
+    ("meta-llama/Llama-2-7b-chat-hf", "Llama-2 7B Chat"),
+]
+
 app = FastAPI(
     title="LLM JFR Analyzer Web UI",
     description="Analyze Java Flight Recorder (.jfr, .json) files with a local or cloud LLM, via web interface."
@@ -23,9 +30,18 @@ app.add_middleware(
     allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
 )
 
+def render_llm_model_select(selected="google/gemma-2b-it"):
+    html = '<label for="llmmodel">LLM Model (local, supported for JVM diagnostics):</label><br>'
+    html += '<select id="llmmodel" name="llmmodel">'
+    for model, label in SUPPORTED_LLM_MODELS:
+        s = "selected" if model == selected else ""
+        html += f'<option value="{model}" {s}>{label} ({model})</option>'
+    html += '</select><br>'
+    return html
+
 @app.get("/", response_class=HTMLResponse)
 async def index():
-    return """
+    return f"""
     <html>
         <head><title>LLM JFR Analyzer</title></head>
         <body style="font-family:sans-serif; margin:2em;">
@@ -33,8 +49,7 @@ async def index():
             <form action="/analyze" method="post" enctype="multipart/form-data">
                 <label for="jfrfile">JFR File (.jfr or .json):</label><br>
                 <input type="file" id="jfrfile" name="jfrfile" accept=".jfr,.json" required><br><br>
-                <label for="llmmodel">LLM Model (HuggingFace repo, optional):</label><br>
-                <input type="text" id="llmmodel" name="llmmodel" value=""><br>
+                {render_llm_model_select()}
                 <label for="chunkthresh">Chunking Threshold (MB, for large .jfrs):</label><br>
                 <input type="number" id="chunkthresh" name="chunkthresh" value="50" min="1" max="1024" step="1"><br>
                 <label>
@@ -50,26 +65,28 @@ async def index():
 @app.post("/analyze")
 async def analyze_jfr(
     jfrfile: UploadFile = File(...),
-    llmmodel: str = Form(""),
+    llmmodel: str = Form("google/gemma-2b-it"),
     chunkthresh: int = Form(50),
     uselocal: str = Form("1")
 ):
     # Load environment
     load_dotenv()
 
+    # Set local LLM/model config for this run - only accept supported!
+    if uselocal in ("1", "true", "yes", "on"):
+        os.environ["USE_LOCAL_LLM"] = "1"
+        # Ensure only supported models are allowed
+        allowed_models = [m[0] for m in SUPPORTED_LLM_MODELS]
+        model_to_use = llmmodel if llmmodel in allowed_models else allowed_models[0]
+        os.environ["LOCAL_LLM_MODEL"] = model_to_use
+    else:
+        os.environ["USE_LOCAL_LLM"] = "0"
+
     # Save uploaded JFR to a temp file
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
         content = await jfrfile.read()
         tmp.write(content)
         tmp_path = tmp.name
-
-    # Set local LLM/model config for this run
-    if uselocal in ("1", "true", "yes", "on"):
-        os.environ["USE_LOCAL_LLM"] = "1"
-        if llmmodel:
-            os.environ["LOCAL_LLM_MODEL"] = llmmodel.strip()
-    else:
-        os.environ["USE_LOCAL_LLM"] = "0"
 
     try:
         events = parse_jfr(tmp_path, chunking_threshold_mb=chunkthresh)
