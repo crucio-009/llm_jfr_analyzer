@@ -28,7 +28,7 @@ A side-project template for a Large Language Model-powered Java Flight Recorder 
 ---
 
 ## Project Structure
-
+```
 llm_jfr_analyzer/
 ├── README.md
 ├── requirements.txt
@@ -51,7 +51,7 @@ llm_jfr_analyzer/
 │   ├── example.jfr          # Placeholder for ignored test JFRs (see below)
 │   └── sample_test.jfr      # Place a REAL .jfr file here for full tests
 └── feature_extractor.py
-
+```
 ---
 
 ## Quickstart
